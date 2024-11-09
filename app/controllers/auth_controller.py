@@ -1,5 +1,6 @@
 import logging
 import jwt
+import re
 import datetime
 from flask import jsonify, current_app as app
 from app import db
@@ -8,25 +9,40 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 def register_user(data):
-    username = data.get("username")
+    mobile = data.get("mobile")
     password = data.get("password")
-    name = data.get("name")
-    family = data.get("family")
-    email = data.get("email")
 
-    if not username or not password:
-        return {"error": "Username and password are required"}, 400
+    logging.info(f"Registration attempt for mobile: {mobile}")
 
-    existing_user = User.query.filter_by(username=username).first()
-    if existing_user:
-        return {"error": "Username already exists"}, 409
+    if not mobile or not password:
+        logging.warning("Registration failed: Missing mobile or password.")
+        return {"error": "Mobile number and password are required"}, 400
+
+    if not re.match(r'^09\d{9}$', mobile):
+        logging.warning(f"Registration failed: Invalid mobile number format for {mobile}.")
+        return {"error": "Invalid mobile number format. It should start with '09' and contain 11 digits."}, 400
+
+    if not (8 <= len(password) <= 16):
+        logging.warning("Registration failed: Password length is invalid.")
+        return {"error": "Password must be between 8 and 16 characters long."}, 400
+
+    existing_user_mobile = User.query.filter_by(mobile=mobile).first()
+    if existing_user_mobile:
+        logging.warning(f"Registration failed: Mobile number {mobile} already exists.")
+        return {"error": "Mobile number already exists"}, 409
 
     hashed_password = generate_password_hash(password)
 
-    new_user = User(username=username, password=hashed_password, name=name, family=family, email=email)
+    new_user = User(mobile=mobile, password=hashed_password)
 
-    db.session.add(new_user)
-    db.session.commit()
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+        logging.info(f"User {mobile} registered successfully.")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to register user {mobile}: {e}")
+        return {"error": "An error occurred during registration"}, 500
 
     return {"message": "User registered successfully"}, 201
 
