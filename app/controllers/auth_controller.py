@@ -1,3 +1,4 @@
+import logging
 import jwt
 import datetime
 from flask import jsonify, current_app as app
@@ -35,16 +36,22 @@ def login_user(data):
     password = data.get("password")
 
     if not username or not password:
+        logging.warning("Login attempt with missing username or password.")
         return {"error": "Username and password are required"}, 400
 
     user = User.query.filter_by(username=username).first()
 
     if not user or not check_password_hash(user.password, password):
+        logging.warning(f"Failed login attempt for username: {username}")
         return {"error": "Invalid username or password"}, 401
+
+    expiration_minutes = app.config['JWT_EXPIRATION_DELTA']
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=expiration_minutes)
 
     token = jwt.encode({
         "user_id": user.id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+        "exp": expiration_time
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
+    logging.info(f"User {username} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
