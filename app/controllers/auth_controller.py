@@ -48,18 +48,18 @@ def register_user(data):
 
 
 def login_user(data):
-    username = data.get("username")
+    mobile = data.get("mobile")
     password = data.get("password")
 
-    if not username or not password:
-        logging.warning("Login attempt with missing username or password.")
-        return {"error": "Username and password are required"}, 400
+    if not mobile or not password:
+        logging.warning("Login attempt with missing mobile or password.")
+        return {"error": "mobile and password are required"}, 400
 
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(mobile=mobile).first()
 
     if not user or not check_password_hash(user.password, password):
-        logging.warning(f"Failed login attempt for username: {username}")
-        return {"error": "Invalid username or password"}, 401
+        logging.warning(f"Failed login attempt for mobile: {mobile}")
+        return {"error": "Invalid mobile or password"}, 401
 
     expiration_minutes = app.config['JWT_EXPIRATION_DELTA']
     expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=expiration_minutes)
@@ -69,5 +69,5 @@ def login_user(data):
         "exp": expiration_time
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
-    logging.info(f"User {username} logged in successfully.")
+    logging.info(f"User {mobile} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
