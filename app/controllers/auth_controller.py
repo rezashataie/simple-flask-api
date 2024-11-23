@@ -8,7 +8,7 @@ from app.models.user_model import User
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-def register_user(data):
+def register_controller(data):
     mobile = data.get("mobile")
     password = data.get("password")
 
@@ -47,7 +47,7 @@ def register_user(data):
     return {"message": "User registered successfully"}, 201
 
 
-def login_user(data):
+def login_controller(data):
     mobile = data.get("mobile")
     password = data.get("password")
 
@@ -71,3 +71,41 @@ def login_user(data):
 
     logging.info(f"User {mobile} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
+
+
+def change_password_controller(data, user_id):
+    # Parse data
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    if not current_password or not new_password:
+        logging.warning("Password change failed: Missing current or new password.")
+        return {"error": "Current password and new password are required"}, 400
+
+    # Fetch user from the database
+    user = User.query.get(user_id)
+    if not user:
+        logging.warning(f"Password change failed: User ID {user_id} not found.")
+        return {"error": "User not found"}, 404
+
+    # Validate current password
+    if not check_password_hash(user.password, current_password):
+        logging.warning(f"Password change failed: Incorrect current password for user ID {user_id}.")
+        return {"error": "Current password is incorrect"}, 401
+
+    # Validate new password length
+    if not (8 <= len(new_password) <= 16):
+        logging.warning(f"Password change failed: Invalid new password length for user ID {user_id}.")
+        return {"error": "Password must be between 8 and 16 characters long."}, 400
+
+    # Update password
+    user.password = generate_password_hash(new_password)
+    try:
+        db.session.commit()
+        logging.info(f"Password changed successfully for user ID {user_id}.")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to change password for user ID {user_id}: {e}")
+        return {"error": "An error occurred while updating the password"}, 500
+
+    return {"message": "Password updated successfully"}, 200
