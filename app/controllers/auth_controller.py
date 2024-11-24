@@ -1,6 +1,8 @@
 import logging
 import jwt
 import re
+import bleach
+import random
 import datetime
 from flask import jsonify, current_app as app
 from app import db
@@ -10,14 +12,15 @@ from app.helpers.email_helpers import send_email
 
 
 def register_controller(data):
-    mobile = data.get("mobile")
-    password = data.get("password")
+    mobile = bleach.clean(data.get("mobile", "").strip())
+    password = bleach.clean(data.get("password", "").strip())
+    name = bleach.clean(data.get("name", "").strip())
 
     logging.info(f"Registration attempt for mobile: {mobile}")
 
-    if not mobile or not password:
-        logging.warning("Registration failed: Missing mobile or password.")
-        return {"error": "Mobile number and password are required"}, 400
+    if not mobile or not password or not name:
+        logging.warning("Registration failed: Missing required feilds.")
+        return {"error": "Missing required feilds."}, 400
 
     if not re.match(r'^09\d{9}$', mobile):
         logging.warning(f"Registration failed: Invalid mobile number format for {mobile}.")
@@ -27,14 +30,21 @@ def register_controller(data):
         logging.warning("Registration failed: Password length is invalid.")
         return {"error": "Password must be between 8 and 16 characters long."}, 400
 
+    if not re.match(r'^[a-zA-Z\u0600-\u06FF\s]+$', name):
+        logging.warning(f"Registration failed: Invalid name format for {name}.")
+        return {"error": "Name must contain only Persian or English letters."}, 400
+    
     existing_user_mobile = User.query.filter_by(mobile=mobile).first()
     if existing_user_mobile:
         logging.warning(f"Registration failed: Mobile number {mobile} already exists.")
         return {"error": "Mobile number already exists"}, 409
 
+    verify_code = random.randint(111111, 999999)
+    logging.info(f"Generated verify_code {verify_code} for mobile {mobile}.")
+    
     hashed_password = generate_password_hash(password)
 
-    new_user = User(mobile=mobile, password=hashed_password)
+    new_user = User(mobile=mobile, password=hashed_password, name=name, verify_code=verify_code)
 
     try:
         db.session.add(new_user)
