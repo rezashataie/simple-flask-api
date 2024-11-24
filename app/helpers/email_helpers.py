@@ -1,14 +1,17 @@
+from flask import render_template
 from flask_mail import Message
 from app import mail
 import logging
 
-def send_email(subject, recipients, body, html=None):
+
+def send_email(subject, recipients, template_name, template_data):
     try:
+        html_content = render_template(f"emails/{template_name}", **template_data)
+
         msg = Message(
             subject=subject,
             recipients=recipients,
-            body=body,
-            html=html,
+            html=html_content,
         )
         mail.send(msg)
         logging.info(f"Email sent successfully to {recipients}")
