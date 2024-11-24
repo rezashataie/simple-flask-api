@@ -12,3 +12,11 @@ class Config:
 
     JWT_EXPIRATION_DELTA = int(os.getenv('JWT_EXPIRATION_DELTA', 60))
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+    
+    MAIL_SERVER = "mail.pan2mim.ir"
+    MAIL_PORT = 465
+    MAIL_USE_TLS = False
+    MAIL_USE_SSL = True
+    MAIL_USERNAME = "info@pan2mim.ir"
+    MAIL_PASSWORD = "P@ssw0rd14!"
+    MAIL_DEFAULT_SENDER = ("Pan2mim", "info@pan2mim.ir")

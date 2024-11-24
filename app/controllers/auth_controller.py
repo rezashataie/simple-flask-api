@@ -6,6 +6,7 @@ from flask import jsonify, current_app as app
 from app import db
 from app.models.user_model import User
 from werkzeug.security import generate_password_hash, check_password_hash
+from app.helpers.email_helpers import send_email
 
 
 def register_controller(data):
@@ -68,6 +69,14 @@ def login_controller(data):
         "user_id": user.id,
         "exp": expiration_time
     }, app.config['SECRET_KEY'], algorithm="HS256")
+
+
+    subject = "Welcome to Our Platform!"
+    recipients = ["rezashataie75@gmail.com"]
+    body = "Thank you for registering with us. We're excited to have you onboard!"
+    html = "<p>Thank you for registering with us. <b>We're excited to have you onboard!</b></p>"
+    
+    send_email(subject, recipients, body, html)
 
     logging.info(f"User {mobile} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
