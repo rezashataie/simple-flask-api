@@ -81,25 +81,25 @@ def login_controller(data):
     }, app.config['SECRET_KEY'], algorithm="HS256")
 
 
-    send_email(
-        subject="Welcome to Our Platform!",
-        recipients=["rezashataie75@gmail.com"],
-        template_name="welcome.html",
-        template_data={
-            "username": "John Doe",
-            "platform_name": "MyApp"
-        }
-    )
+    # send_email(
+    #     subject="Welcome to Our Platform!",
+    #     recipients=["rezashataie75@gmail.com"],
+    #     template_name="welcome.html",
+    #     template_data={
+    #         "username": "John Doe",
+    #         "platform_name": "MyApp"
+    #     }
+    # )
     
-    send_email(
-        subject="Password Reset Request",
-        recipients=["rezashataie75@gmail.com"],
-        template_name="reset-password.html",
-        template_data={
-            "username": "John Doe",
-            "reset_link": "https://example.com/reset-password?token=abc123"
-        }
-    )
+    # send_email(
+    #     subject="Password Reset Request",
+    #     recipients=["rezashataie75@gmail.com"],
+    #     template_name="reset-password.html",
+    #     template_data={
+    #         "username": "John Doe",
+    #         "reset_link": "https://example.com/reset-password?token=abc123"
+    #     }
+    # )
 
     logging.info(f"User {mobile} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
