@@ -13,38 +13,58 @@ from app.helpers.email_helpers import send_email
 
 def register_controller(data):
     mobile = bleach.clean(data.get("mobile", "").strip())
+    email = bleach.clean(data.get("email", "").strip().lower())
     password = bleach.clean(data.get("password", "").strip())
     name = bleach.clean(data.get("name", "").strip())
 
     logging.info(f"Registration attempt for mobile: {mobile}")
 
-    if not mobile or not password or not name:
+    if not mobile or not password or not name or not email:
         logging.warning("Registration failed: Missing required feilds.")
         return {"error": "Missing required feilds."}, 400
 
-    if not re.match(r'^09\d{9}$', mobile):
-        logging.warning(f"Registration failed: Invalid mobile number format for {mobile}.")
-        return {"error": "Invalid mobile number format. It should start with '09' and contain 11 digits."}, 400
+    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+        logging.warning(f"Registration failed: Invalid email format for {email}.")
+        return {"error": "Invalid email format."}, 400
+
+    if not re.match(r"^09\d{9}$", mobile):
+        logging.warning(
+            f"Registration failed: Invalid mobile number format for {mobile}."
+        )
+        return {
+            "error": "Invalid mobile number format. It should start with '09' and contain 11 digits."
+        }, 400
 
     if not (8 <= len(password) <= 16):
         logging.warning("Registration failed: Password length is invalid.")
         return {"error": "Password must be between 8 and 16 characters long."}, 400
 
-    if not re.match(r'^[a-zA-Z\u0600-\u06FF\s]+$', name):
+    if not re.match(r"^[a-zA-Z\u0600-\u06FF\s]+$", name):
         logging.warning(f"Registration failed: Invalid name format for {name}.")
         return {"error": "Name must contain only Persian or English letters."}, 400
-    
+
     existing_user_mobile = User.query.filter_by(mobile=mobile).first()
     if existing_user_mobile:
         logging.warning(f"Registration failed: Mobile number {mobile} already exists.")
         return {"error": "Mobile number already exists"}, 409
 
+    existing_user_email = User.query.filter_by(email=email).first()
+    if existing_user_email:
+        logging.warning(f"Registration failed: Email {email} already exists.")
+        return {"error": "Email already exists"}, 409
+
     verify_code = random.randint(111111, 999999)
     logging.info(f"Generated verify_code {verify_code} for mobile {mobile}.")
-    
+
     hashed_password = generate_password_hash(password)
 
-    new_user = User(mobile=mobile, password=hashed_password, name=name, verify_code=verify_code)
+    new_user = User(
+        mobile=mobile,
+        email=email,
+        password=hashed_password,
+        name=name,
+        verify_code=verify_code,
+    )
 
     try:
         db.session.add(new_user)
@@ -54,6 +74,13 @@ def register_controller(data):
         db.session.rollback()
         logging.error(f"Failed to register user {mobile}: {e}")
         return {"error": "An error occurred during registration"}, 500
+
+    send_email(
+        subject="Welcome to Pan2mim!",
+        recipients=[email],
+        template_name="register",
+        template_data={"name": name, "code": verify_code},
+    )
 
     return {"message": "User registered successfully"}, 201
 
@@ -72,34 +99,16 @@ def login_controller(data):
         logging.warning(f"Failed login attempt for mobile: {mobile}")
         return {"error": "Invalid mobile or password"}, 401
 
-    expiration_minutes = app.config['JWT_EXPIRATION_DELTA']
-    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=expiration_minutes)
+    expiration_minutes = app.config["JWT_EXPIRATION_DELTA"]
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(
+        minutes=expiration_minutes
+    )
 
-    token = jwt.encode({
-        "user_id": user.id,
-        "exp": expiration_time
-    }, app.config['SECRET_KEY'], algorithm="HS256")
-
-
-    # send_email(
-    #     subject="Welcome to Our Platform!",
-    #     recipients=["rezashataie75@gmail.com"],
-    #     template_name="welcome.html",
-    #     template_data={
-    #         "username": "John Doe",
-    #         "platform_name": "MyApp"
-    #     }
-    # )
-    
-    # send_email(
-    #     subject="Password Reset Request",
-    #     recipients=["rezashataie75@gmail.com"],
-    #     template_name="reset-password.html",
-    #     template_data={
-    #         "username": "John Doe",
-    #         "reset_link": "https://example.com/reset-password?token=abc123"
-    #     }
-    # )
+    token = jwt.encode(
+        {"user_id": user.id, "exp": expiration_time},
+        app.config["SECRET_KEY"],
+        algorithm="HS256",
+    )
 
     logging.info(f"User {mobile} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
@@ -122,12 +131,16 @@ def change_password_controller(data, user_id):
 
     # Validate current password
     if not check_password_hash(user.password, current_password):
-        logging.warning(f"Password change failed: Incorrect current password for user ID {user_id}.")
+        logging.warning(
+            f"Password change failed: Incorrect current password for user ID {user_id}."
+        )
         return {"error": "Current password is incorrect"}, 401
 
     # Validate new password length
     if not (8 <= len(new_password) <= 16):
-        logging.warning(f"Password change failed: Invalid new password length for user ID {user_id}.")
+        logging.warning(
+            f"Password change failed: Invalid new password length for user ID {user_id}."
+        )
         return {"error": "Password must be between 8 and 16 characters long."}, 400
 
     # Update password

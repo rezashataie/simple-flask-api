@@ -28,9 +28,12 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=current_time_tehran)
     updated_at = db.Column(db.DateTime, default=current_time_tehran, onupdate=current_time_tehran)
 
-    def __init__(self, mobile, name):
+    def __init__(self, mobile, email, password, name, verify_code):
         self.mobile = mobile
+        self.email = email
+        self.password = password
         self.name = name
+        self.verify_code = verify_code
 
     def __repr__(self):
         return f"<User {self.mobile}>"

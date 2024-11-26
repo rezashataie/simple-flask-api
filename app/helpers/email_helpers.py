@@ -6,7 +6,7 @@ import logging
 
 def send_email(subject, recipients, template_name, template_data):
     try:
-        html_content = render_template(f"emails/{template_name}", **template_data)
+        html_content = render_template(f"emails/{template_name}.html", **template_data)
 
         msg = Message(
             subject=subject,
