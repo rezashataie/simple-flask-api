@@ -85,6 +85,63 @@ def register_controller(data):
     return {"message": "User registered successfully"}, 201
 
 
+def active_user_controller(data):
+    mobile = bleach.clean(data.get("mobile", "").strip())
+    otp = bleach.clean(data.get("otp", "").strip())
+
+    logging.info(f"Activation attempt for mobile: {mobile} with OTP: {otp}")
+
+    if not mobile or not otp:
+        logging.warning("Activation failed: Missing required fields.")
+        return {"error": "Missing required fields."}, 400
+
+    if not re.match(r"^09\d{9}$", mobile):
+        logging.warning(f"Activation failed: Invalid mobile number format for {mobile}.")
+        return {
+            "error": "Invalid mobile number format. It should start with '09' and contain 11 digits."
+        }, 400
+
+    if not re.match(r"^\d{6}$", otp):
+        logging.warning(f"Activation failed: Invalid OTP format for {otp}.")
+        return {"error": "Invalid OTP format. It should be a 6-digit number."}, 400
+
+    user = User.query.filter_by(mobile=mobile).first()
+    if not user:
+        logging.warning(f"Activation failed: No user found with mobile {mobile}.")
+        return {"error": "User not found."}, 404
+
+    if str(user.verify_code) != otp:
+        try:
+            user.verify_try += 1
+            logging.warning(f"Incorrect OTP for mobile {mobile}. Attempt {user.verify_try}/3.")
+            
+            if user.verify_try > 5:
+                db.session.delete(user)
+                db.session.commit()
+                logging.warning(f"User {mobile} deleted after 3 failed OTP attempts.")
+                return {"error": "Too many incorrect attempts. User has been deleted."}, 403
+            
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Failed to update verify_try for user {mobile}: {e}")
+            return {"error": "An error occurred while processing your request."}, 500
+
+        return {"error": "Invalid OTP. Please try again."}, 401
+
+    try:
+        user.status = "active"
+        user.verify_try = 0
+        db.session.commit()
+        logging.info(f"User {mobile} activated successfully.")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to activate user {mobile}: {e}")
+        return {"error": "An error occurred during activation."}, 500
+
+    return {"message": "User activated successfully."}, 200
+
+
 def login_controller(data):
     mobile = data.get("mobile")
     password = data.get("password")
