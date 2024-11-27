@@ -4,7 +4,7 @@ import re
 import bleach
 import random
 import datetime
-from flask import jsonify, current_app as app
+from flask import current_app as app
 from app import db
 from app.models.user_model import User
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -38,6 +38,12 @@ def register_controller(data):
     if not (8 <= len(password) <= 16):
         logging.warning("Registration failed: Password length is invalid.")
         return {"error": "Password must be between 8 and 16 characters long."}, 400
+
+    if not re.match(r"^[a-zA-Z0-9\-_!@#$%?]+$", password):
+        logging.warning(f"Registration failed: Invalid password format.")
+        return {
+            "error": "Password can only contain letters, numbers, and the following characters: - _ ! @ # $ % ?"
+        }, 400
 
     if not re.match(r"^[a-zA-Z\u0600-\u06FF\s]+$", name):
         logging.warning(f"Registration failed: Invalid name format for {name}.")
@@ -96,7 +102,9 @@ def active_user_controller(data):
         return {"error": "Missing required fields."}, 400
 
     if not re.match(r"^09\d{9}$", mobile):
-        logging.warning(f"Activation failed: Invalid mobile number format for {mobile}.")
+        logging.warning(
+            f"Activation failed: Invalid mobile number format for {mobile}."
+        )
         return {
             "error": "Invalid mobile number format. It should start with '09' and contain 11 digits."
         }, 400
@@ -113,14 +121,18 @@ def active_user_controller(data):
     if str(user.verify_code) != otp:
         try:
             user.verify_try += 1
-            logging.warning(f"Incorrect OTP for mobile {mobile}. Attempt {user.verify_try}/3.")
-            
+            logging.warning(
+                f"Incorrect OTP for mobile {mobile}. Attempt {user.verify_try}/3."
+            )
+
             if user.verify_try > 5:
                 db.session.delete(user)
                 db.session.commit()
                 logging.warning(f"User {mobile} deleted after 3 failed OTP attempts.")
-                return {"error": "Too many incorrect attempts. User has been deleted."}, 403
-            
+                return {
+                    "error": "Too many incorrect attempts. User has been deleted."
+                }, 403
+
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -143,64 +155,65 @@ def active_user_controller(data):
 
 
 def login_controller(data):
-    mobile = data.get("mobile")
-    password = data.get("password")
+    email = bleach.clean(data.get("email", "").strip().lower())
+    password = bleach.clean(data.get("password", "").strip())
 
-    if not mobile or not password:
-        logging.warning("Login attempt with missing mobile or password.")
-        return {"error": "mobile and password are required"}, 400
+    if not email or not password:
+        logging.warning("Login attempt with missing email or password.")
+        return {"error": "email and password are required"}, 400
 
-    user = User.query.filter_by(mobile=mobile).first()
+    user = User.query.filter_by(email=email).first()
 
     if not user or not check_password_hash(user.password, password):
-        logging.warning(f"Failed login attempt for mobile: {mobile}")
-        return {"error": "Invalid mobile or password"}, 401
+        logging.warning(f"Failed login attempt for email: {email}")
+        return {"error": "Invalid email or password"}, 401
 
     expiration_minutes = app.config["JWT_EXPIRATION_DELTA"]
-    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(
+    expiration_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
         minutes=expiration_minutes
     )
 
     token = jwt.encode(
-        {"user_id": user.id, "exp": expiration_time},
+        {"user_id": user.id, "name": user.name, "exp": expiration_time},
         app.config["SECRET_KEY"],
         algorithm="HS256",
     )
 
-    logging.info(f"User {mobile} logged in successfully.")
+    logging.info(f"User {email} logged in successfully.")
     return {"message": "Login successful", "token": token}, 200
 
 
 def change_password_controller(data, user_id):
-    # Parse data
-    current_password = data.get("current_password")
-    new_password = data.get("new_password")
+    current_password = bleach.clean(data.get("current_password", "").strip())
+    new_password = bleach.clean(data.get("new_password", "").strip())
 
     if not current_password or not new_password:
         logging.warning("Password change failed: Missing current or new password.")
         return {"error": "Current password and new password are required"}, 400
 
-    # Fetch user from the database
     user = User.query.get(user_id)
     if not user:
         logging.warning(f"Password change failed: User ID {user_id} not found.")
         return {"error": "User not found"}, 404
 
-    # Validate current password
     if not check_password_hash(user.password, current_password):
         logging.warning(
             f"Password change failed: Incorrect current password for user ID {user_id}."
         )
         return {"error": "Current password is incorrect"}, 401
 
-    # Validate new password length
     if not (8 <= len(new_password) <= 16):
         logging.warning(
             f"Password change failed: Invalid new password length for user ID {user_id}."
         )
         return {"error": "Password must be between 8 and 16 characters long."}, 400
 
-    # Update password
+    if not re.match(r"^[a-zA-Z0-9\-_!@#$%?]+$", new_password):
+        logging.warning(f"Registration failed: Invalid password format.")
+        return {
+            "error": "Password can only contain letters, numbers, and the following characters: - _ ! @ # $ % ?"
+        }, 400
+
     user.password = generate_password_hash(new_password)
     try:
         db.session.commit()
@@ -211,3 +224,6 @@ def change_password_controller(data, user_id):
         return {"error": "An error occurred while updating the password"}, 500
 
     return {"message": "Password updated successfully"}, 200
+
+
+# def forgot_password_controller(data, user_id):
