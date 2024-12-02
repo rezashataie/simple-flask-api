@@ -2,69 +2,65 @@ from flask import Blueprint, request, jsonify
 from app.controllers.auth_controller import AuthController
 from app.helpers.auth_helpers import token_required
 
-# Create Blueprint
-auth_bp = Blueprint("auth", __name__)
-
-# Instantiate the AuthController
-auth_controller = AuthController()
+auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
-@auth_bp.route("/auth/register", methods=["POST"])
+@auth_bp.route("/register", methods=["POST"])
 def register_route():
     """
-    Handle user registration.
+    Route for user registration.
     """
     data = request.get_json()
-    response = auth_controller.register(data)
-    return jsonify(response[0]), response[1]
+    response = AuthController.register(data)
+    return jsonify(response)
 
 
-@auth_bp.route("/auth/register/active-user", methods=["POST"])
-def active_user_route():
+@auth_bp.route("/register/activate", methods=["POST"])
+def activate_user_route():
     """
-    Handle user activation.
+    Route for user activation via verification code.
     """
     data = request.get_json()
-    response = auth_controller.activate_user(data)
-    return jsonify(response[0]), response[1]
+    response = AuthController.activate_user(data)
+    return jsonify(response)
 
 
-@auth_bp.route("/auth/login", methods=["POST"])
+@auth_bp.route("/login", methods=["POST"])
 def login_route():
     """
-    Handle user login.
+    Route for user login.
     """
     data = request.get_json()
-    response = auth_controller.login(data)
-    return jsonify(response[0]), response[1]
+    response = AuthController.login(data)
+    return jsonify(response)
 
 
-@auth_bp.route("/auth/change-password", methods=["POST"])
+@auth_bp.route("/change-password", methods=["POST"])
 @token_required
 def change_password_route(user_id):
     """
-    Handle password change for logged-in users.
+    Route for changing the user's password.
     """
     data = request.get_json()
-    response = auth_controller.change_password(data, user_id)
-    return jsonify(response[0]), response[1]
+    response = AuthController.change_password(data, user_id)
+    return jsonify(response)
 
 
-@auth_bp.route("/auth/reset-password", methods=["POST"])
+@auth_bp.route("/reset-password", methods=["POST"])
 def reset_password_route():
     """
-    Request a password reset.
+    Route for requesting a password reset code.
     """
     data = request.get_json()
-    response = auth_controller.reset_password_request(data)
-    return jsonify(response[0]), response[1]
+    response = AuthController.reset_password_request(data)
+    return jsonify(response)
 
 
-@auth_bp.route("/auth/reset-password/update", methods=["POST"])
-def reset_password_update_route():
+@auth_bp.route("/reset-password/confirm", methods=["POST"])
+def reset_password_confirm_route():
     """
-    Handle password reset update.
+    Route for confirming the password reset using the code.
     """
     data = request.get_json()
-    response = auth_controller.reset_password_update(data)
-    return jsonify(response[0]), response[1]
+    response = AuthController.reset_password_confirm(data)
+    return jsonify(response)
