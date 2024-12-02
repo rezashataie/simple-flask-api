@@ -1,17 +1,13 @@
-from datetime import datetime
-import random
-import pytz
+from app.models.base_model import BaseModel
 from app import db
 
-tehran = pytz.timezone("Asia/Tehran")
 
+class User(BaseModel):
+    """
+    User model for managing user-related data.
+    """
 
-def current_time_tehran():
-    return datetime.now(tehran)
-
-
-class User(db.Model):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     mobile = db.Column(db.String(15), unique=True, nullable=False)
@@ -24,9 +20,6 @@ class User(db.Model):
     verify_try = db.Column(db.Integer, nullable=False, default=0)
     reset_code = db.Column(db.Integer, nullable=True)
     reset_try = db.Column(db.Integer, nullable=False, default=0)
-
-    created_at = db.Column(db.DateTime, default=current_time_tehran)
-    updated_at = db.Column(db.DateTime, default=current_time_tehran, onupdate=current_time_tehran)
 
     def __init__(self, mobile, email, password, name, verify_code):
         self.mobile = mobile
