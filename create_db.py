@@ -1,4 +1,5 @@
 from app import create_app, db
+from app.models.base_model import BaseModel
 from app.models.category_model import Category
 from app.models.game_model import Game
 from app.models.user_model import User
