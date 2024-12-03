@@ -1,12 +1,14 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_mail import Mail
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from config import get_config
 from dotenv import load_dotenv
 import logging
-import os
+
 
 # Load environment variables
 load_dotenv()
@@ -15,9 +17,8 @@ load_dotenv()
 db = SQLAlchemy()
 migrate = Migrate()
 mail = Mail()
-
-# Initialize JWTManager
 jwt = JWTManager()
+limiter = Limiter(key_func=get_remote_address)
 
 
 def create_app():
@@ -33,6 +34,9 @@ def create_app():
 
     # Initialize extensions
     initialize_extensions(app)
+
+    # Register error handlers
+    register_error_handlers(app)
 
     # Register routes
     register_routes(app)
@@ -62,6 +66,7 @@ def initialize_extensions(app):
     migrate.init_app(app, db)
     mail.init_app(app)
     jwt.init_app(app)
+    limiter.init_app(app)
     logging.info("Flask extensions initialized.")
 
 
@@ -74,3 +79,22 @@ def register_routes(app):
 
     routes_register(app)
     logging.info("Routes registered successfully.")
+
+
+def register_error_handlers(app):
+    """
+    Register custom error handlers.
+    """
+    from flask_limiter.errors import RateLimitExceeded
+
+    @app.errorhandler(RateLimitExceeded)
+    def handle_rate_limit_exceeded(e):
+        return (
+            jsonify(
+                {
+                    "error": "You have exceeded your request rate limit.",
+                    "message": str(e),
+                }
+            ),
+            429,
+        )

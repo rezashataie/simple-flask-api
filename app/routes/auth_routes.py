@@ -1,12 +1,14 @@
 from flask import Blueprint, request, jsonify
 from app.controllers.auth_controller import AuthController
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app import limiter
 
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
 @auth_bp.route("/register", methods=["POST"])
+@limiter.limit("5 per minute")
 def register_route():
     """
     Route for user registration.
@@ -17,6 +19,7 @@ def register_route():
 
 
 @auth_bp.route("/register/activate", methods=["POST"])
+@limiter.limit("10 per hour")
 def activate_user_route():
     """
     Route for user activation via verification code.
@@ -27,6 +30,7 @@ def activate_user_route():
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("10 per minute")
 def login_route():
     """
     Route for user login.
@@ -38,6 +42,7 @@ def login_route():
 
 @auth_bp.route("/change-password", methods=["POST"])
 @jwt_required()
+@limiter.limit("5 per minute")
 def change_password_route():
     """
     Route for changing the user's password.
@@ -48,7 +53,8 @@ def change_password_route():
     return jsonify(response)
 
 
-@auth_bp.route("/reset-password", methods=["POST"])
+@auth_bp.route("/reset-password-request", methods=["POST"])
+@limiter.limit("5 per hour")
 def reset_password_route():
     """
     Route for requesting a password reset code.
@@ -58,7 +64,8 @@ def reset_password_route():
     return jsonify(response)
 
 
-@auth_bp.route("/reset-password/confirm", methods=["POST"])
+@auth_bp.route("/reset-password-update", methods=["POST"])
+@limiter.limit("5 per hour")
 def reset_password_confirm_route():
     """
     Route for confirming the password reset using the code.
