@@ -14,10 +14,6 @@ def current_time_tehran():
 
 
 class BaseModel(db.Model):
-    """
-    Base model to include common fields and methods for all models.
-    """
-
     __abstract__ = True
 
     created_at = db.Column(db.DateTime, default=current_time_tehran)

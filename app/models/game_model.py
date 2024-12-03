@@ -3,10 +3,6 @@ from app import db
 
 
 class Game(BaseModel):
-    """
-    Game model for managing game-related data.
-    """
-
     __tablename__ = "games"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

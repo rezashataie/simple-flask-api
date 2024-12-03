@@ -4,6 +4,7 @@ from app.models.category_model import Category
 from app.models.game_model import Game
 from app.models.user_model import User
 from app.models.word_model import Word
+from app.models.wallet_model import Wallet
 
 app = create_app()
 

@@ -3,10 +3,6 @@ from app import db
 
 
 class User(BaseModel):
-    """
-    User model for managing user-related data.
-    """
-
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

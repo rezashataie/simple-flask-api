@@ -3,10 +3,6 @@ from app import db
 
 
 class Category(BaseModel):
-    """
-    Category model for managing category-related data.
-    """
-
     __tablename__ = "categories"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
