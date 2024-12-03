@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_mail import Mail
@@ -7,8 +7,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from config import get_config
 from dotenv import load_dotenv
+from app.helpers.response_helpers import api_response
 import logging
-
+from werkzeug.exceptions import HTTPException
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +30,7 @@ def create_app():
     # Create Flask app
     app = Flask(__name__)
     app.config.from_object(get_config())
+
     # Set up logging
     setup_logging(app)
 
@@ -86,15 +88,36 @@ def register_error_handlers(app):
     Register custom error handlers.
     """
     from flask_limiter.errors import RateLimitExceeded
+    from app.helpers.response_helpers import api_response
+    from werkzeug.exceptions import HTTPException
 
     @app.errorhandler(RateLimitExceeded)
     def handle_rate_limit_exceeded(e):
-        return (
-            jsonify(
-                {
-                    "error": "You have exceeded your request rate limit.",
-                    "message": str(e),
-                }
-            ),
-            429,
+        """Handle rate limit exceeded errors with a standardized JSON response."""
+        return api_response(
+            success=False,
+            message="You have exceeded your request rate limit.",
+            errors={"detail": str(e)},
+            status_code=429,
+        )
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e):
+        """Handle HTTP exceptions with a standardized JSON response."""
+        return api_response(
+            success=False,
+            message=e.name,
+            errors={"code": e.code, "description": e.description},
+            status_code=e.code,
+        )
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Handle uncaught exceptions with a standardized JSON response."""
+        logging.error(f"Unhandled Exception: {e}")
+        return api_response(
+            success=False,
+            message="An unexpected error occurred.",
+            errors={"exception": str(e)},
+            status_code=500,
         )
