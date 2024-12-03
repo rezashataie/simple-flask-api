@@ -1,18 +1,18 @@
+# app/controllers/auth_controller.py
+
 import logging
 import bleach
 import random
 import re
-from datetime import datetime, timezone, timedelta
-from flask import current_app as app
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models.user_model import User
-from app import db
 from app.helpers.email_helpers import EmailService
 from email_validator import validate_email, EmailNotValidError
 import phonenumbers
 from phonenumbers.phonenumberutil import NumberParseException
 from password_strength import PasswordPolicy
 from sqlalchemy.exc import SQLAlchemyError
+from app.helpers.db_helpers import session_scope
 from flask_jwt_extended import create_access_token
 
 
@@ -56,7 +56,7 @@ class AuthController:
         try:
             valid_email = validate_email(email)
             email = valid_email.email  # Normalized email
-        except EmailNotValidError as e:
+        except EmailNotValidError:
             logging.warning(
                 f"Registration failed: Invalid email format for {self.anonymize_email(email)}."
             )
@@ -92,47 +92,38 @@ class AuthController:
             return {"error": "Name must contain only Persian or English letters."}, 400
 
         # Check for existing user with the same email or mobile
-        if User.query.filter_by(mobile=mobile).first():
-            logging.warning(
-                f"Registration failed: Mobile number {self.anonymize_mobile(mobile)} already exists."
-            )
-            return {"error": "Mobile number already exists"}, 409
+        with session_scope() as session:
+            if session.query(User).filter_by(mobile=mobile).first():
+                logging.warning(
+                    f"Registration failed: Mobile number {self.anonymize_mobile(mobile)} already exists."
+                )
+                return {"error": "Mobile number already exists"}, 409
 
-        if User.query.filter_by(email=email).first():
-            logging.warning(
-                f"Registration failed: Email {self.anonymize_email(email)} already exists."
-            )
-            return {"error": "Email already exists"}, 409
+            if session.query(User).filter_by(email=email).first():
+                logging.warning(
+                    f"Registration failed: Email {self.anonymize_email(email)} already exists."
+                )
+                return {"error": "Email already exists"}, 409
 
-        # Generate verification code
-        verify_code = random.randint(111111, 999999)
-        logging.info(
-            f"Generated verify_code for mobile {self.anonymize_mobile(mobile)}."
-        )
-
-        hashed_password = generate_password_hash(password)
-
-        # Create a new user
-        new_user = User(
-            mobile=mobile,
-            email=email,
-            password=hashed_password,
-            name=name,
-            verify_code=verify_code,
-        )
-
-        try:
-            db.session.add(new_user)
-            db.session.commit()
+            # Generate verification code
+            verify_code = random.randint(111111, 999999)
             logging.info(
-                f"User {self.anonymize_mobile(mobile)} registered successfully."
+                f"Generated verify_code for mobile {self.anonymize_mobile(mobile)}."
             )
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            logging.error(
-                f"Failed to register user {self.anonymize_mobile(mobile)}: {e}"
+
+            hashed_password = generate_password_hash(password)
+
+            # Create a new user
+            new_user = User(
+                mobile=mobile,
+                email=email,
+                password=hashed_password,
+                name=name,
+                verify_code=verify_code,
             )
-            return {"error": "An error occurred during registration"}, 500
+            session.add(new_user)
+
+        logging.info(f"User {self.anonymize_mobile(mobile)} registered successfully.")
 
         # Send verification email
         self.email_service.send(
@@ -163,7 +154,7 @@ class AuthController:
         try:
             valid_email = validate_email(email)
             email = valid_email.email  # Normalized email
-        except EmailNotValidError as e:
+        except EmailNotValidError:
             logging.warning(
                 f"Activation failed: Invalid email format for {self.anonymize_email(email)}."
             )
@@ -171,46 +162,46 @@ class AuthController:
 
         # Validate OTP code
         if not re.match(r"^\d{6}$", otp):
-            logging.warning(f"Activation failed: Invalid OTP format.")
+            logging.warning("Activation failed: Invalid OTP format.")
             return {"error": "Invalid OTP format. It should be a 6-digit number."}, 400
 
-        # Check user status
-        user = User.query.filter_by(email=email, status="inactive").first()
-        if not user:
-            logging.warning(
-                f"Activation failed: No user found with email {self.anonymize_email(email)}."
-            )
-            return {"error": "User not found."}, 404
-
-        # Verify OTP code
-        if str(user.verify_code) != otp:
-            user.verify_try += 1
-            logging.warning(
-                f"Incorrect OTP for email {self.anonymize_email(email)}. Attempt {user.verify_try}/5."
-            )
-
-            if user.verify_try > 5:
-                db.session.delete(user)
-                db.session.commit()
-                logging.warning(
-                    f"User {self.anonymize_email(email)} deleted after 5 failed OTP attempts."
-                )
-                return {
-                    "error": "Too many incorrect attempts. User has been deleted."
-                }, 403
-
-            db.session.commit()
-            return {"error": "Invalid OTP. Please try again."}, 401
-
-        # Activate user
-        user.status = "active"
-        user.verify_try = 0
-        user.verify_code = None
         try:
-            db.session.commit()
-            logging.info(f"User {self.anonymize_email(email)} activated successfully.")
+            with session_scope() as session:
+                user = (
+                    session.query(User)
+                    .filter_by(email=email, status="inactive")
+                    .first()
+                )
+                if not user:
+                    logging.warning(
+                        f"Activation failed: No user found with email {self.anonymize_email(email)}."
+                    )
+                    return {"error": "User not found."}, 404
+
+                # Verify OTP code
+                if str(user.verify_code) != otp:
+                    user.verify_try += 1
+                    if user.verify_try > 5:
+                        session.delete(user)
+                        logging.warning(
+                            f"User {self.anonymize_email(email)} deleted after 5 failed OTP attempts."
+                        )
+                        return {
+                            "error": "Too many incorrect attempts. User has been deleted."
+                        }, 403
+                    logging.warning(
+                        f"Incorrect OTP for email {self.anonymize_email(email)}. Attempt {user.verify_try}/5."
+                    )
+                    return {"error": "Invalid OTP. Please try again."}, 401
+
+                # Activate user
+                user.status = "active"
+                user.verify_try = 0
+                user.verify_code = None
+                logging.info(
+                    f"User {self.anonymize_email(email)} activated successfully."
+                )
         except SQLAlchemyError as e:
-            db.session.rollback()
             logging.error(f"Failed to activate user {self.anonymize_email(email)}: {e}")
             return {"error": "An error occurred during activation."}, 500
 
@@ -232,28 +223,33 @@ class AuthController:
         try:
             valid_email = validate_email(email)
             email = valid_email.email  # Normalized email
-        except EmailNotValidError as e:
+        except EmailNotValidError:
             logging.warning(
                 f"Login failed: Invalid email format for {self.anonymize_email(email)}."
             )
             return {"error": "Invalid email or password"}, 401
 
-        user = User.query.filter_by(email=email).first()
+        try:
+            with session_scope() as session:
+                user = session.query(User).filter_by(email=email).first()
+                if not user or not check_password_hash(user.password, password):
+                    logging.warning(
+                        f"Failed login attempt for email: {self.anonymize_email(email)}"
+                    )
+                    return {"error": "Invalid email or password"}, 401
 
-        if not user or not check_password_hash(user.password, password):
-            logging.warning(
-                f"Failed login attempt for email: {self.anonymize_email(email)}"
-            )
-            return {"error": "Invalid email or password"}, 401
-
-        # Generate JWT token using Flask-JWT-Extended
-        additional_claims = {"name": user.name}
-        access_token = create_access_token(
-            identity=user.id, additional_claims=additional_claims
-        )
-
-        logging.info(f"User {self.anonymize_email(email)} logged in successfully.")
-        return {"message": "Login successful", "token": access_token}, 200
+                # Generate JWT token
+                additional_claims = {"name": user.name}
+                access_token = create_access_token(
+                    identity=user.id, additional_claims=additional_claims
+                )
+                logging.info(
+                    f"User {self.anonymize_email(email)} logged in successfully."
+                )
+                return {"message": "Login successful", "token": access_token}, 200
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to log in user {self.anonymize_email(email)}: {e}")
+            return {"error": "An error occurred during login"}, 500
 
     def change_password(self, data, user_id):
         """
@@ -269,35 +265,36 @@ class AuthController:
             logging.warning("Password change failed: Missing current or new password.")
             return {"error": "Current password and new password are required"}, 400
 
-        user = User.query.get(user_id)
-        if not user:
-            logging.warning(f"Password change failed: User ID {user_id} not found.")
-            return {"error": "User not found"}, 404
-
-        # Verify current password
-        if not check_password_hash(user.password, current_password):
-            logging.warning(
-                f"Password change failed: Incorrect current password for user ID {user_id}."
-            )
-            return {"error": "Current password is incorrect"}, 401
-
-        # Validate new password according to policy
-        password_errors = self.password_policy.test(new_password)
-        if password_errors:
-            logging.warning(
-                "Password change failed: New password does not meet policy requirements."
-            )
-            return {
-                "error": "New password must be at least 8 characters long and include uppercase letters, numbers, and special characters."
-            }, 400
-
-        # Update password
-        user.password = generate_password_hash(new_password)
         try:
-            db.session.commit()
-            logging.info(f"Password changed successfully for user ID {user_id}.")
+            with session_scope() as session:
+                user = session.query(User).get(user_id)
+                if not user:
+                    logging.warning(
+                        f"Password change failed: User ID {user_id} not found."
+                    )
+                    return {"error": "User not found"}, 404
+
+                # Verify current password
+                if not check_password_hash(user.password, current_password):
+                    logging.warning(
+                        f"Password change failed: Incorrect current password for user ID {user_id}."
+                    )
+                    return {"error": "Current password is incorrect"}, 401
+
+                # Validate new password
+                password_errors = self.password_policy.test(new_password)
+                if password_errors:
+                    logging.warning(
+                        "Password change failed: New password does not meet policy requirements."
+                    )
+                    return {
+                        "error": "New password must be at least 8 characters long and include uppercase letters, numbers, and special characters."
+                    }, 400
+
+                # Update password
+                user.password = generate_password_hash(new_password)
+                logging.info(f"Password changed successfully for user ID {user_id}.")
         except SQLAlchemyError as e:
-            db.session.rollback()
             logging.error(f"Failed to change password for user ID {user_id}: {e}")
             return {"error": "An error occurred while updating the password"}, 500
 
@@ -318,35 +315,33 @@ class AuthController:
         try:
             valid_email = validate_email(email)
             email = valid_email.email  # Normalized email
-        except EmailNotValidError as e:
+        except EmailNotValidError:
             logging.warning(
                 f"Password reset failed: Invalid email format for {self.anonymize_email(email)}."
             )
             return {"error": "Invalid email format."}, 400
 
-        user = User.query.filter_by(email=email).first()
-
-        if not user:
-            logging.warning(
-                f"Password reset: User not found for {self.anonymize_email(email)}"
-            )
-            return {"error": "Invalid email"}, 404
-
-        # Generate reset code
-        reset_code = random.randint(111111, 999999)
         try:
-            user.reset_code = reset_code
-            user.reset_try = 0
-            db.session.commit()
-            logging.info(
-                f"Reset code saved successfully for user {self.anonymize_email(email)}"
-            )
+            with session_scope() as session:
+                user = session.query(User).filter_by(email=email).first()
+                if not user:
+                    logging.warning(
+                        f"Password reset: User not found for {self.anonymize_email(email)}"
+                    )
+                    return {"error": "Invalid email"}, 404
+
+                # Generate reset code
+                reset_code = random.randint(111111, 999999)
+                user.reset_code = reset_code
+                user.reset_try = 0
+                logging.info(
+                    f"Reset code saved successfully for user {self.anonymize_email(email)}"
+                )
         except SQLAlchemyError as e:
-            db.session.rollback()
             logging.error(
                 f"Failed to save reset code for user {self.anonymize_email(email)}: {e}"
             )
-            return {"error": "An error occurred during reset password."}, 500
+            return {"error": "An error occurred during password reset request."}, 500
 
         # Send reset code via email
         self.email_service.send(
@@ -376,7 +371,7 @@ class AuthController:
         try:
             valid_email = validate_email(email)
             email = valid_email.email  # Normalized email
-        except EmailNotValidError as e:
+        except EmailNotValidError:
             logging.warning(
                 f"Password reset update failed: Invalid email format for {self.anonymize_email(email)}."
             )
@@ -384,59 +379,56 @@ class AuthController:
 
         # Validate OTP code
         if not re.match(r"^\d{6}$", otp):
-            logging.warning(f"Password reset update failed: Invalid OTP format.")
+            logging.warning("Password reset update failed: Invalid OTP format.")
             return {"error": "Invalid OTP format. It should be a 6-digit number."}, 400
 
-        user = User.query.filter_by(email=email, status="active").first()
-        if not user:
-            logging.warning(
-                f"Password reset update failed: No user found with email {self.anonymize_email(email)}."
-            )
-            return {"error": "User not found."}, 404
+        try:
+            with session_scope() as session:
+                user = (
+                    session.query(User).filter_by(email=email, status="active").first()
+                )
+                if not user:
+                    logging.warning(
+                        f"Password reset update failed: No user found with email {self.anonymize_email(email)}."
+                    )
+                    return {"error": "User not found."}, 404
 
-        # Verify OTP code
-        if str(user.reset_code) != otp:
-            user.reset_try += 1
-            logging.warning(
-                f"Incorrect OTP for email {self.anonymize_email(email)}. Attempt {user.reset_try}/5."
-            )
+                # Verify OTP code
+                if str(user.reset_code) != otp:
+                    user.reset_try += 1
+                    if user.reset_try > 5:
+                        user.status = "inactive"
+                        user.reset_try = 0
+                        user.reset_code = None
+                        logging.warning(
+                            f"User {self.anonymize_email(email)} disabled after 5 failed OTP attempts."
+                        )
+                        return {
+                            "error": "Too many incorrect attempts. User has been disabled."
+                        }, 403
+                    logging.warning(
+                        f"Incorrect OTP for email {self.anonymize_email(email)}. Attempt {user.reset_try}/5."
+                    )
+                    return {"error": "Invalid OTP. Please try again."}, 401
 
-            if user.reset_try > 5:
-                user.status = "inactive"
+                # Validate new password
+                password_errors = self.password_policy.test(new_password)
+                if password_errors:
+                    logging.warning(
+                        "Password reset update failed: New password does not meet policy requirements."
+                    )
+                    return {
+                        "error": "New password must be at least 8 characters long and include uppercase letters, numbers, and special characters."
+                    }, 400
+
+                # Update password
+                user.password = generate_password_hash(new_password)
                 user.reset_try = 0
                 user.reset_code = None
-                db.session.commit()
-                logging.warning(
-                    f"User {self.anonymize_email(email)} disabled after 5 failed OTP attempts."
+                logging.info(
+                    f"Password changed successfully for email {self.anonymize_email(email)}."
                 )
-                return {
-                    "error": "Too many incorrect attempts. User has been disabled."
-                }, 403
-
-            db.session.commit()
-            return {"error": "Invalid OTP. Please try again."}, 401
-
-        # Validate new password according to policy
-        password_errors = self.password_policy.test(new_password)
-        if password_errors:
-            logging.warning(
-                "Password reset update failed: New password does not meet policy requirements."
-            )
-            return {
-                "error": "New password must be at least 8 characters long and include uppercase letters, numbers, and special characters."
-            }, 400
-
-        # Update password
-        user.password = generate_password_hash(new_password)
-        user.reset_try = 0
-        user.reset_code = None
-        try:
-            db.session.commit()
-            logging.info(
-                f"Password changed successfully for email {self.anonymize_email(email)}."
-            )
         except SQLAlchemyError as e:
-            db.session.rollback()
             logging.error(
                 f"Failed to change password for email {self.anonymize_email(email)}: {e}"
             )

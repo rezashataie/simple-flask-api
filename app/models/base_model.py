@@ -1,6 +1,7 @@
 from datetime import datetime
 import pytz
 from app import db
+from app.helpers.db_helpers import session_scope
 
 tehran = pytz.timezone("Asia/Tehran")
 
@@ -28,20 +29,12 @@ class BaseModel(db.Model):
         """
         Save the current instance to the database.
         """
-        try:
-            db.session.add(self)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            raise e
+        with session_scope() as session:
+            session.add(self)
 
     def delete(self):
         """
         Delete the current instance from the database.
         """
-        try:
-            db.session.delete(self)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            raise e
+        with session_scope() as session:
+            session.delete(self)
