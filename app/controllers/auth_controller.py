@@ -13,6 +13,7 @@ import phonenumbers
 from phonenumbers.phonenumberutil import NumberParseException
 from password_strength import PasswordPolicy
 from sqlalchemy.exc import SQLAlchemyError
+from flask_jwt_extended import create_access_token
 
 
 class AuthController:
@@ -246,8 +247,6 @@ class AuthController:
             return {"error": "Invalid email or password"}, 401
 
         # Generate JWT token using Flask-JWT-Extended
-        from flask_jwt_extended import create_access_token
-
         additional_claims = {"name": user.name}
         access_token = create_access_token(
             identity=user.id, additional_claims=additional_claims

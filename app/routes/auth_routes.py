@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.controllers.auth_controller import AuthController
-from app.helpers.auth_helpers import token_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -36,11 +37,12 @@ def login_route():
 
 
 @auth_bp.route("/change-password", methods=["POST"])
-@token_required
-def change_password_route(user_id):
+@jwt_required()
+def change_password_route():
     """
     Route for changing the user's password.
     """
+    user_id = get_jwt_identity()
     data = request.get_json()
     response = AuthController.change_password(data, user_id)
     return jsonify(response)

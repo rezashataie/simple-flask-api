@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 
@@ -21,13 +22,16 @@ class Config:
     DB_NAME = os.getenv("DB_NAME")
 
     SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{DB_USER}:" f"{DB_PASSWORD}@" f"{DB_HOST}/" f"{DB_NAME}"
+        f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Security and JWT settings
     SECRET_KEY = os.getenv("SECRET_KEY")
-    JWT_EXPIRATION_DELTA = int(os.getenv("JWT_EXPIRATION_DELTA", 300))
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(
+        minutes=int(os.getenv("JWT_EXPIRATION_DELTA", 300))
+    )
 
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
@@ -45,40 +49,41 @@ class Config:
     )
 
 
-# class DevelopmentConfig(Config):
-#     """
-#     Configuration for development environment.
-#     """
+class DevelopmentConfig(Config):
+    """
+    Configuration for development environment.
+    """
 
-#     DEBUG = True
-
-
-# class ProductionConfig(Config):
-#     """
-#     Configuration for production environment.
-#     """
-
-#     DEBUG = False
-#     LOG_LEVEL = "INFO"
+    DEBUG = True
+    SQLALCHEMY_ECHO = True  # Show SQL queries in logs
 
 
-# class TestingConfig(Config):
-#     """
-#     Configuration for testing environment.
-#     """
+class ProductionConfig(Config):
+    """
+    Configuration for production environment.
+    """
 
-#     DEBUG = True
-#     TESTING = True
-#     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"  # In-memory database for testing
+    DEBUG = False
+    LOG_LEVEL = "INFO"
 
 
-# def get_config():
-#     """
-#     Returns the configuration class based on the FLASK_ENV environment variable.
-#     """
-#     env = os.getenv("FLASK_ENV", "development").lower()
-#     if env == "production":
-#         return ProductionConfig
-#     elif env == "testing":
-#         return TestingConfig
-#     return DevelopmentConfig
+class TestingConfig(Config):
+    """
+    Configuration for testing environment.
+    """
+
+    DEBUG = True
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"  # In-memory database for testing
+
+
+def get_config():
+    """
+    Returns the configuration class based on the FLASK_ENV environment variable.
+    """
+    env = os.getenv("FLASK_ENV", "development").lower()
+    if env == "production":
+        return ProductionConfig
+    elif env == "testing":
+        return TestingConfig
+    return DevelopmentConfig

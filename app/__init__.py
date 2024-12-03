@@ -2,7 +2,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_mail import Mail
-from config import Config
+from flask_jwt_extended import JWTManager
+from config import get_config
 from dotenv import load_dotenv
 import logging
 import os
@@ -15,6 +16,9 @@ db = SQLAlchemy()
 migrate = Migrate()
 mail = Mail()
 
+# Initialize JWTManager
+jwt = JWTManager()
+
 
 def create_app():
     """
@@ -23,8 +27,7 @@ def create_app():
     """
     # Create Flask app
     app = Flask(__name__)
-    app.config.from_object(Config)
-
+    app.config.from_object(get_config())
     # Set up logging
     setup_logging(app)
 
@@ -58,6 +61,7 @@ def initialize_extensions(app):
     db.init_app(app)
     migrate.init_app(app, db)
     mail.init_app(app)
+    jwt.init_app(app)
     logging.info("Flask extensions initialized.")
 
 
