@@ -9,7 +9,7 @@ auth_controller = AuthController()
 
 
 @auth_bp.route("/register", methods=["POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("50 per minute")
 def register_route():
     """
     Route for user registration.

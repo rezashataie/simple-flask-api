@@ -160,6 +160,9 @@ class AuthController:
                     verify_code=verify_code,
                 )
                 session.add(new_user)
+                session.flush()  # Flush the session to get new_user.id
+                user_id = new_user.id  # Get the user_id before the session is closed
+
         except SQLAlchemyError as e:
             logging.error(
                 f"Failed to register user {self.anonymize_mobile(mobile)}: {e}"
@@ -195,7 +198,7 @@ class AuthController:
         return api_response(
             success=True,
             message="User registered successfully. Please check your email for the verification code.",
-            data={"user_id": new_user.id},
+            data={"user_id": user_id},
             status_code=201,
         )
 
