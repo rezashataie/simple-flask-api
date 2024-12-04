@@ -37,16 +37,16 @@ def get_private_key_route():
     return response, status_code
 
 
-# @wallet_bp.route("/list", methods=["GET"])
-# @jwt_required()
-# @admin_required
-# def get_wallets_route():
-#     """
-#     Route for retrieving all wallets.
-#     """
-#     user_id = get_jwt_identity()
-#     response, status_code = wallet_controller.get_wallets(user_id)
-#     return response, status_code
+@wallet_bp.route("/list", methods=["GET"])
+@jwt_required()
+@admin_required
+def get_wallets_route():
+    """
+    Route for retrieving all wallets.
+    """
+    user_id = get_jwt_identity()
+    response, status_code = wallet_controller.get_wallets(user_id)
+    return response, status_code
 
 
 # @wallet_bp.route("/<int:wallet_id>", methods=["GET"])
