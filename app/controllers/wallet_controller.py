@@ -11,21 +11,10 @@ from app.errors import ErrorCodes, ERROR_MESSAGES
 
 
 class WalletController:
-    """
-    This class handles all wallet-related actions including
-    creating a wallet, retrieving wallets, and getting wallet details.
-    """
-
     def create_wallet(self, data, user_id=None):
-        """
-        Create a new wallet.
-        :param data: Dictionary containing network (optional).
-        :param user_id: ID of the logged-in user (if applicable).
-        """
         network = bleach.clean(data.get("network", "").strip())
         count = bleach.clean(data.get("count", "").strip())
 
-        # Validate inputs
         if not network or not count:
             return api_response(
                 success=False,
@@ -34,7 +23,6 @@ class WalletController:
                 status_code=400,
             )
 
-        # Validate network
         if network not in ["Polygon", "Ethereum", "BEP20"]:
             logging.warning(f"Invalid network specified: {network}")
             return api_response(
@@ -46,7 +34,6 @@ class WalletController:
                 status_code=400,
             )
 
-        # Validate count
         if not count.isdigit():
             return api_response(
                 success=False,
@@ -69,7 +56,6 @@ class WalletController:
 
         wallets_data = []
 
-        # Generate new wallets
         try:
             with session_scope() as session:
                 for _ in range(count):
@@ -77,7 +63,6 @@ class WalletController:
                     private_key = account.key.hex()
                     address = account.address
 
-                    # Create Wallet instance
                     new_wallet = Wallet(address=address, network=network)
                     new_wallet.set_private_key(private_key)
 
@@ -107,10 +92,6 @@ class WalletController:
         )
 
     def get_wallets(self, user_id=None):
-        """
-        Retrieve all wallets.
-        :param user_id: ID of the logged-in user (if applicable).
-        """
         try:
             with session_scope() as session:
                 wallets = session.query(Wallet).all()
@@ -140,11 +121,6 @@ class WalletController:
         )
 
     def get_wallet_by_id(self, wallet_id, user_id=None):
-        """
-        Retrieve wallet details by wallet ID.
-        :param wallet_id: ID of the wallet.
-        :param user_id: ID of the logged-in user (if applicable).
-        """
         try:
             with session_scope() as session:
                 wallet = session.query(Wallet).get(wallet_id)
@@ -181,14 +157,8 @@ class WalletController:
         )
 
     def get_private_key(self, data, user_id=None):
-        """
-        Retrieve the private key of a wallet (use with caution).
-        :param wallet_id: ID of the wallet.
-        :param user_id: ID of the logged-in user (if applicable).
-        """
         wallet_id = bleach.clean(data.get("wallet_id", "").strip())
 
-        # Validate inputs
         if not wallet_id:
             return api_response(
                 success=False,
@@ -217,7 +187,6 @@ class WalletController:
                         status_code=404,
                     )
 
-                # Decrypt private key
                 try:
                     private_key = wallet.get_private_key()
                 except InvalidToken as e:
@@ -248,7 +217,6 @@ class WalletController:
                 status_code=500,
             )
 
-        # WARNING: Ensure that access to this method is strictly controlled.
         logging.warning(f"Private key retrieved for wallet ID {wallet_id}.")
 
         return api_response(
