@@ -12,7 +12,7 @@ wallet_controller = WalletController()
 @wallet_bp.route("/create", methods=["POST"])
 @jwt_required()
 @admin_required
-@limiter.limit("5 per minute")
+@limiter.limit("50 per minute")
 def create_wallet_route():
     """
     Route for creating a new wallet.
@@ -23,38 +23,39 @@ def create_wallet_route():
     return response, status_code
 
 
-@wallet_bp.route("/list", methods=["GET"])
+@wallet_bp.route("/get-private-key", methods=["POST"])
 @jwt_required()
 @admin_required
-def get_wallets_route():
+@limiter.limit("50 per minute")
+def get_private_key_route():
     """
-    Route for retrieving all wallets.
+    Route for retrieving the private key of a wallet.
     """
     user_id = get_jwt_identity()
-    response, status_code = wallet_controller.get_wallets(user_id)
+    data = request.get_json()
+    response, status_code = wallet_controller.get_private_key(data, user_id)
     return response, status_code
 
 
-@wallet_bp.route("/<int:wallet_id>", methods=["GET"])
-@jwt_required()
-@admin_required
-def get_wallet_by_id_route(wallet_id):
-    """
-    Route for retrieving wallet details by ID.
-    """
-    user_id = get_jwt_identity()
-    response, status_code = wallet_controller.get_wallet_by_id(wallet_id, user_id)
-    return response, status_code
-
-
-# دسترسی به کلید خصوصی باید محدود شود
-# @wallet_bp.route("/<int:wallet_id>/private-key", methods=["GET"])
+# @wallet_bp.route("/list", methods=["GET"])
 # @jwt_required()
 # @admin_required
-# def get_private_key_route(wallet_id):
+# def get_wallets_route():
 #     """
-#     Route for retrieving the private key of a wallet.
+#     Route for retrieving all wallets.
 #     """
 #     user_id = get_jwt_identity()
-#     response, status_code = wallet_controller.get_private_key(wallet_id, user_id)
+#     response, status_code = wallet_controller.get_wallets(user_id)
+#     return response, status_code
+
+
+# @wallet_bp.route("/<int:wallet_id>", methods=["GET"])
+# @jwt_required()
+# @admin_required
+# def get_wallet_by_id_route(wallet_id):
+#     """
+#     Route for retrieving wallet details by ID.
+#     """
+#     user_id = get_jwt_identity()
+#     response, status_code = wallet_controller.get_wallet_by_id(wallet_id, user_id)
 #     return response, status_code

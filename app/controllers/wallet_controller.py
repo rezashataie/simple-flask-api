@@ -1,4 +1,5 @@
 import logging
+import bleach
 from app.models.wallet_model import Wallet
 from app.helpers.db_helpers import session_scope
 from app.helpers.response_helpers import api_response
@@ -21,35 +22,74 @@ class WalletController:
         :param data: Dictionary containing network (optional).
         :param user_id: ID of the logged-in user (if applicable).
         """
-        network = data.get("network", "Polygon").strip()
+        network = bleach.clean(data.get("network", "").strip())
+        count = bleach.clean(data.get("count", "").strip())
+
+        # Validate inputs
+        if not network or not count:
+            return api_response(
+                success=False,
+                message=ERROR_MESSAGES[ErrorCodes.MISSING_FIELDS],
+                errors={"missing_fields": "nwtwork, count"},
+                status_code=400,
+            )
 
         # Validate network
-        if network not in ["Polygon", "Ethereum"]:
+        if network not in ["Polygon", "Ethereum", "BEP20"]:
             logging.warning(f"Invalid network specified: {network}")
             return api_response(
                 success=False,
                 message="Invalid network specified.",
-                errors={"network": "Supported networks are 'Polygon' and 'Ethereum'."},
+                errors={
+                    "network": "Supported networks are 'Polygon', 'Ethereum' and 'BEP20'."
+                },
                 status_code=400,
             )
 
-        # Generate a new wallet
-        account = Account.create()
-        private_key = account.privateKey.hex()
-        address = account.address
+        # Validate count
+        if not count.isdigit():
+            return api_response(
+                success=False,
+                message="Invalid count. It must be a number.",
+                errors={"count": "count must contain only digits."},
+                status_code=400,
+            )
 
-        # Create Wallet instance
-        new_wallet = Wallet(address=address, network=network)
-        new_wallet.set_private_key(private_key)
+        try:
+            count = int(count)
+            if count <= 0:
+                raise ValueError("Count must be a positive integer.")
+        except ValueError as e:
+            return api_response(
+                success=False,
+                message="Invalid count value.",
+                errors={"count": str(e)},
+                status_code=400,
+            )
 
-        # Save to database
+        wallets_data = []
+
+        # Generate new wallets
         try:
             with session_scope() as session:
-                session.add(new_wallet)
-                session.flush()
-                wallet_id = new_wallet.id
+                for _ in range(count):
+                    account = Account.create()
+                    private_key = account.key.hex()
+                    address = account.address
+
+                    # Create Wallet instance
+                    new_wallet = Wallet(address=address, network=network)
+                    new_wallet.set_private_key(private_key)
+
+                    session.add(new_wallet)
+                    session.flush()
+                    wallet_id = new_wallet.id
+
+                    wallets_data.append(
+                        {"wallet_id": wallet_id, "address": address, "network": network}
+                    )
         except SQLAlchemyError as e:
-            logging.error(f"Failed to create wallet: {e}")
+            logging.error(f"Failed to create wallets: {e}")
             return api_response(
                 success=False,
                 message=ERROR_MESSAGES[ErrorCodes.UNEXPECTED_ERROR],
@@ -57,15 +97,12 @@ class WalletController:
                 status_code=500,
             )
 
-        logging.info(f"Wallet created successfully with ID {wallet_id}.")
-
-        # Prepare response data
-        response_data = {"wallet_id": wallet_id, "address": address, "network": network}
+        logging.info(f"{count} wallet(s) created successfully.")
 
         return api_response(
             success=True,
-            message="Wallet created successfully.",
-            data=response_data,
+            message=f"{count} wallet(s) created successfully.",
+            data={"wallets": wallets_data},
             status_code=201,
         )
 
@@ -143,14 +180,30 @@ class WalletController:
             status_code=200,
         )
 
-    def get_private_key(self, wallet_id, user_id=None):
+    def get_private_key(self, data, user_id=None):
         """
         Retrieve the private key of a wallet (use with caution).
         :param wallet_id: ID of the wallet.
         :param user_id: ID of the logged-in user (if applicable).
         """
-        # WARNING: Exposing private keys is a significant security risk.
-        # This method should be secured and used only when absolutely necessary.
+        wallet_id = bleach.clean(data.get("wallet_id", "").strip())
+
+        # Validate inputs
+        if not wallet_id:
+            return api_response(
+                success=False,
+                message=ERROR_MESSAGES[ErrorCodes.MISSING_FIELDS],
+                errors={"missing_fields": "wallet_id"},
+                status_code=400,
+            )
+
+        if not wallet_id.isdigit():
+            return api_response(
+                success=False,
+                message="Invalid wallet_id. It must be a number.",
+                errors={"wallet_id": "wallet_id must contain only digits."},
+                status_code=400,
+            )
 
         try:
             with session_scope() as session:
