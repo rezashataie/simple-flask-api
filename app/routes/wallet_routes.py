@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from app.controllers.wallet_controller import WalletController
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.helpers.decorators import admin_required
 from app import limiter
 
 wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
@@ -10,6 +11,7 @@ wallet_controller = WalletController()
 
 @wallet_bp.route("/create", methods=["POST"])
 @jwt_required()
+@admin_required
 @limiter.limit("5 per minute")
 def create_wallet_route():
     """
@@ -23,6 +25,7 @@ def create_wallet_route():
 
 @wallet_bp.route("/list", methods=["GET"])
 @jwt_required()
+@admin_required
 def get_wallets_route():
     """
     Route for retrieving all wallets.
@@ -34,6 +37,7 @@ def get_wallets_route():
 
 @wallet_bp.route("/<int:wallet_id>", methods=["GET"])
 @jwt_required()
+@admin_required
 def get_wallet_by_id_route(wallet_id):
     """
     Route for retrieving wallet details by ID.
@@ -46,6 +50,7 @@ def get_wallet_by_id_route(wallet_id):
 # دسترسی به کلید خصوصی باید محدود شود
 # @wallet_bp.route("/<int:wallet_id>/private-key", methods=["GET"])
 # @jwt_required()
+# @admin_required
 # def get_private_key_route(wallet_id):
 #     """
 #     Route for retrieving the private key of a wallet.
