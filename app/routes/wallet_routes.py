@@ -14,9 +14,6 @@ wallet_controller = WalletController()
 @admin_required
 @limiter.limit("50 per minute")
 def create_wallet_route():
-    """
-    Route for creating a new wallet.
-    """
     user_id = get_jwt_identity()
     data = request.get_json()
     response, status_code = wallet_controller.create_wallet(data, user_id)
@@ -28,34 +25,36 @@ def create_wallet_route():
 @admin_required
 @limiter.limit("50 per minute")
 def get_private_key_route():
-    """
-    Route for retrieving the private key of a wallet.
-    """
     user_id = get_jwt_identity()
     data = request.get_json()
     response, status_code = wallet_controller.get_private_key(data, user_id)
     return response, status_code
 
 
-@wallet_bp.route("/list", methods=["GET"])
+@wallet_bp.route("/transfer-usdt", methods=["POST"])
 @jwt_required()
 @admin_required
-def get_wallets_route():
-    """
-    Route for retrieving all wallets.
-    """
+@limiter.limit("50 per minute")
+def transfer_usdt_route():
     user_id = get_jwt_identity()
-    response, status_code = wallet_controller.get_wallets(user_id)
+    data = request.get_json()
+    response, status_code = wallet_controller.transfer_usdt(data, user_id)
     return response, status_code
+
+
+# @wallet_bp.route("/list", methods=["GET"])
+# @jwt_required()
+# @admin_required
+# def get_wallets_route():
+#     user_id = get_jwt_identity()
+#     response, status_code = wallet_controller.get_wallets(user_id)
+#     return response, status_code
 
 
 # @wallet_bp.route("/<int:wallet_id>", methods=["GET"])
 # @jwt_required()
 # @admin_required
 # def get_wallet_by_id_route(wallet_id):
-#     """
-#     Route for retrieving wallet details by ID.
-#     """
 #     user_id = get_jwt_identity()
 #     response, status_code = wallet_controller.get_wallet_by_id(wallet_id, user_id)
 #     return response, status_code
