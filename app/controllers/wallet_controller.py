@@ -1,3 +1,4 @@
+import json
 import logging
 import bleach
 from app.models.wallet_model import Wallet
@@ -7,11 +8,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 from eth_account import Account
-from flask_jwt_extended import get_jwt_identity
 from cryptography.fernet import InvalidToken
 from app.errors import ErrorCodes, ERROR_MESSAGES
-import json
-import os
 
 
 class WalletController:
@@ -296,7 +294,6 @@ class WalletController:
 
                 # Decrypt the private key
                 try:
-                    # session.refresh(wallet)
                     private_key = wallet.get_private_key()
                     wallet_address = wallet.address
                 except InvalidToken as e:
