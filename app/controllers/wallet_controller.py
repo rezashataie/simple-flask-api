@@ -325,7 +325,7 @@ class WalletController:
                 "0xc2132d05d31c914a87c6611c10748aeb04b58e8f"
             )
 
-            with open("abi/usdt_abi.json", "r") as abi_file:
+            with open("abi/usdt_polygon_abi.json", "r") as abi_file:
                 USDT_ABI = json.load(abi_file)
 
             usdt_contract = w3.eth.contract(address=USDT_CONTRACT_ADDRESS, abi=USDT_ABI)
