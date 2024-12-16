@@ -8,32 +8,43 @@ class ContractInfo:
 
     CREATE_WALLET = {
         "address": "0x34170e3197ad3511f476E8Fc6F9ddCE578758974",
-        "abi_file": "create_wallet_abi.json",
+        "abi": "create_wallet_abi.json",
         "network": "Polygon",
     }
 
     USDT_POLYGON = {
         "address": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
-        "abi_file": "usdt_polygon_abi.json",
+        "abi": "usdt_polygon_abi.json",
         "network": "Polygon",
     }
 
     REPOINT = {
         "address": "0x3EE1BBD5C99177f407200fAF8413285F7fc60EDD",
-        "abi_file": "repoint_abi.json",
+        "abi": "repoint_abi.json",
+        "network": "Polygon",
+    }
+
+    REPOINT_PLUS = {
+        "address": "0xFb00e3865b3431823ded138280A82C8741CCCEDD",
+        "abi": "repoint_plus_abi.json",
         "network": "Polygon",
     }
 
     @classmethod
-    def get_abi(cls, abi_file):
-        abi_path = os.path.join(cls.ABIS_DIR, abi_file)
+    def get_abi(cls, abi):
+        abi_path = os.path.join(cls.ABIS_DIR, abi)
         try:
             with open(abi_path, "r") as file:
                 abi_data = json.load(file)
-                return abi_data.get("abi", [])
+
+                if isinstance(abi_data, list):
+                    return abi_data
+
+                if isinstance(abi_data, dict) and "abi" in abi_data:
+                    return abi_data["abi"]
+
+                raise ValueError(f"Invalid ABI format in file '{abi}'.")
         except FileNotFoundError:
-            raise FileNotFoundError(
-                f"ABI file '{abi_file}' not found in '{cls.ABIS_DIR}'."
-            )
+            raise FileNotFoundError(f"ABI file '{abi}' not found in '{cls.ABIS_DIR}'.")
         except json.JSONDecodeError:
-            raise ValueError(f"Error decoding JSON in ABI file '{abi_file}'.")
+            raise ValueError(f"Error decoding JSON in ABI file '{abi}'.")

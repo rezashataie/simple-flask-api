@@ -4,6 +4,7 @@ from app.models.wallet_model import Wallet
 from app.helpers.db_helpers import session_scope
 from app.helpers.response_helpers import api_response
 from sqlalchemy.exc import SQLAlchemyError
+from app.contracts import ContractInfo
 from web3 import Web3
 from web3.types import HexBytes
 from web3.datastructures import AttributeDict
@@ -12,44 +13,75 @@ from cryptography.fernet import InvalidToken
 
 
 class ContractController:
-    """
-    A controller for interacting with a smart contract on the Polygon network.
-    """
-
     def __init__(self):
         self.rpc_url = "https://polygon-rpc.com"
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
         self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
-        with open("abi/create_wallet_abi.json", "r") as abi_file:
-            self.contract_abi = json.load(abi_file)
+    def load_contract(self, contract_name):
+        try:
+            contract_info = getattr(ContractInfo, contract_name, None)
+            logging.info(f"Loading contract info for {contract_name}: {contract_info}")
 
-        self.contract_address = self.w3.to_checksum_address(
-            "0x34170e3197ad3511f476E8Fc6F9ddCE578758974"
-        )
+            if not contract_info:
+                raise ValueError(
+                    f"Contract '{contract_name}' not found in ContractInfo."
+                )
 
-        self.contract = self.w3.eth.contract(
-            address=self.contract_address, abi=self.contract_abi
-        )
+            if not isinstance(contract_info, dict):
+                raise TypeError(
+                    f"Expected contract info to be a dict, but got {type(contract_info).__name__}."
+                )
+
+            self.contract_address = self.w3.to_checksum_address(
+                contract_info["address"]
+            )
+            self.contract_abi = ContractInfo.get_abi(contract_info["abi"])
+
+            if not isinstance(self.contract_abi, list) or not self.contract_abi:
+                raise ValueError(
+                    f"Invalid or empty ABI for contract '{contract_name}'."
+                )
+
+            self.contract = self.w3.eth.contract(
+                address=self.contract_address, abi=self.contract_abi
+            )
+
+        except FileNotFoundError as e:
+            logging.error(f"ABI file not found for contract '{contract_name}': {e}")
+            raise
+        except json.JSONDecodeError as e:
+            logging.error(
+                f"Error decoding ABI JSON for contract '{contract_name}': {e}"
+            )
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error loading contract '{contract_name}': {e}")
+            raise
 
     def call_function(self, data):
-        """
-        Call a read-only function from the contract.
-        :param data: Dictionary containing 'function_name' and optional 'args'.
-        """
+        contract_name = data.get("contract_name")
         function_name = data.get("function_name")
         args = data.get("args", [])
 
-        if not function_name:
+        if not contract_name or not function_name:
             return api_response(
                 success=False,
-                message="Function name is required.",
-                errors={"missing_fields": "function_name"},
+                message="Contract name and function name are required.",
+                errors={"missing_fields": "contract_name, function_name"},
                 status_code=400,
             )
 
         try:
-            contract_function = getattr(self.contract.functions, function_name)
+            self.load_contract(contract_name)
+            contract_function = getattr(self.contract.functions, function_name, None)
+            if not contract_function:
+                return api_response(
+                    success=False,
+                    message=f"Function '{function_name}' not found in contract '{contract_name}'.",
+                    errors={"function_name": f"'{function_name}' not found"},
+                    status_code=400,
+                )
 
             result = contract_function(*args).call()
 
@@ -58,8 +90,18 @@ class ContractController:
                 message="Function executed successfully.",
                 data={"result": result},
             )
+        except ValueError as e:
+            logging.error(f"Value error when calling function {function_name}: {e}")
+            return api_response(
+                success=False,
+                message="Invalid input for contract function.",
+                errors={"exception": str(e)},
+                status_code=400,
+            )
         except Exception as e:
-            logging.error(f"Error calling function {function_name}: {e}")
+            logging.error(
+                f"Error calling function {function_name} on contract {contract_name}: {e}"
+            )
             return api_response(
                 success=False,
                 message="Error calling contract function.",
@@ -68,23 +110,22 @@ class ContractController:
             )
 
     def send_transaction(self, data):
-        """
-        Send a write transaction to the contract.
-        :param data: Dictionary containing 'function_name', 'args', and 'wallet_id'.
-        """
+        contract_name = data.get("contract_name")
         function_name = data.get("function_name")
         args = data.get("args", [])
         wallet_id = data.get("wallet_id")
 
-        if not function_name or not wallet_id:
+        if not contract_name or not function_name or not wallet_id:
             return api_response(
                 success=False,
-                message="Function name and wallet ID are required.",
-                errors={"missing_fields": "function_name, wallet_id"},
+                message="Contract name, function name, and wallet ID are required.",
+                errors={"missing_fields": "contract_name, function_name, wallet_id"},
                 status_code=400,
             )
 
         try:
+            self.load_contract(contract_name)
+
             with session_scope() as session:
                 wallet = session.query(Wallet).get(wallet_id)
                 if not wallet:
