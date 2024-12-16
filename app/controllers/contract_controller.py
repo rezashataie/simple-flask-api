@@ -1,6 +1,7 @@
 import json
 import logging
 from app.models.wallet_model import Wallet
+from app.models.contract_wallet_model import Contract_Wallet
 from app.helpers.db_helpers import session_scope
 from app.helpers.response_helpers import api_response
 from sqlalchemy.exc import SQLAlchemyError
@@ -88,8 +89,9 @@ class ContractController:
             return api_response(
                 success=True,
                 message="Function executed successfully.",
-                data={"result": result},
+                data={"result": result[0]},
             )
+            
         except ValueError as e:
             logging.error(f"Value error when calling function {function_name}: {e}")
             return api_response(
@@ -108,6 +110,42 @@ class ContractController:
                 errors={"exception": str(e)},
                 status_code=500,
             )
+
+
+    def get_contract_wallet(self):
+        contract_name = "CREATE_WALLET"
+        function_name = "getPortBatch"
+        args = [list(range(1, 101))]
+        
+        self.load_contract(contract_name)
+        contract_function = getattr(self.contract.functions, function_name, None)
+        result = contract_function(*args).call()
+        
+        try:
+            with session_scope() as session:
+                for wallet in result[0]:
+                    new_wallet = Contract_Wallet(
+                        address = wallet,
+                        is_active = False
+                    )
+                    session.add(new_wallet)
+                
+        except SQLAlchemyError as e:
+            logging.error("Failed")
+            return api_response(
+                success=False,
+                message="Database error",
+                errors={"database": str(e)},
+                status_code=500,
+            )
+        
+        
+        return api_response(
+            success=True,
+            message="Function executed successfully.",
+            data={"result": result[0]},
+        )
+
 
     def send_transaction(self, data):
         contract_name = data.get("contract_name")
