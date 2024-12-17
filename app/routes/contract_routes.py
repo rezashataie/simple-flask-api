@@ -38,13 +38,13 @@ def send_transaction_route():
     return response, status_code
 
 
-@contract_bp.route("/get-contract-wallet", methods=["POST"])
-@jwt_required()
-@admin_required
-@limiter.limit("20 per minute")
-def get_contract_wallet_route():
-    """
-    Route to send a transaction to the smart contract.
-    """
-    response, status_code = contract_controller.get_contract_wallet()
-    return response, status_code
+# @contract_bp.route("/get-contract-wallet", methods=["POST"])
+# @jwt_required()
+# @admin_required
+# @limiter.limit("20 per minute")
+# def get_contract_wallet_route():
+#     """
+#     Route to send a transaction to the smart contract.
+#     """
+#     response, status_code = contract_controller.get_contract_wallet()
+#     return response, status_code

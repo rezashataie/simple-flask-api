@@ -7,7 +7,7 @@ class ContractInfo:
     ABIS_DIR = os.path.join(BASE_DIR, "../abi")
 
     CREATE_WALLET = {
-        "address": "0x34170e3197ad3511f476E8Fc6F9ddCE578758974",
+        "address": "0x5da97814449Ee64164791834E04d7a821B43237e",
         "abi": "create_wallet_abi.json",
         "network": "Polygon",
     }

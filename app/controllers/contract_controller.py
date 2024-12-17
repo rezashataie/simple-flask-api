@@ -89,7 +89,7 @@ class ContractController:
             return api_response(
                 success=True,
                 message="Function executed successfully.",
-                data={"result": result[0]},
+                data={"result": result},
             )
             
         except ValueError as e:
@@ -115,7 +115,7 @@ class ContractController:
     def get_contract_wallet(self):
         contract_name = "CREATE_WALLET"
         function_name = "getPortBatch"
-        args = [list(range(1, 101))]
+        args = [list(range(14001, 15001))]
         
         self.load_contract(contract_name)
         contract_function = getattr(self.contract.functions, function_name, None)
